@@ -1,0 +1,150 @@
+import bcrypt from 'bcrypt';
+import jwt from 'jsonwebtoken';
+import prisma from '../config/supabase.js';
+
+
+export const register = async (req, res) => {
+  try {
+
+    const {
+      name,
+      last_name,
+      email,
+      password,
+      role,
+      
+    } = req.body;
+
+    const existingUser = await prisma.user.findUnique({
+      where: { email }
+    });
+
+    if (existingUser) {
+      return res.status(400).json({
+        message: 'User already exists'
+      });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const newUser = await prisma.user.create({
+      data: {
+        name,
+        last_name,
+        email,
+        password: hashedPassword
+      }
+    });
+
+    const roleFallback = role ?? "STUDENT";
+
+    // Extraemos el string si vino dentro de un array ["STUDENT"]
+    const roleRaw = Array.isArray(roleFallback) ? roleFallback[0] : roleFallback;
+
+    // Convertimos a texto puro en MAYÚSCULAS para que calce con tu Enum
+    const roleToFind = String(roleRaw).toUpperCase();
+
+    const foundRole = await prisma.role.findUnique({
+      where: {
+        name: roleToFind
+      }
+    });
+
+    await prisma.userRole.create({
+      data: {
+        user_id: newUser.user_id,
+        role_id: foundRole.role_id
+      }
+    });
+
+    const userResponse = {
+      user_id: newUser.user_id,
+    }
+
+    res.status(201).json({
+      message: 'User created successfully',
+      user: userResponse
+    });
+
+  } catch (error) {
+    console.error("erro gei: ", error)
+    res.status(500).json({
+      error: error.message
+    });
+
+  }
+};
+
+export const login = async (req, res) => {
+  try {
+
+    const { email, password } = req.body;
+
+    //Obtiene el usuario por email e incluye sus roles
+    const user = await prisma.user.findUnique({
+      where: { email },
+      include: {
+        user_roles: {
+          include: {
+            role: true
+          }
+        }
+      }
+    });
+
+    // Usuario no encontrado
+    if (!user) {
+      return res.status(404).json({
+        message: 'User not found'
+      });
+    }
+
+    //Validar contraseña 
+    const validPassword = await bcrypt.compare(
+      password,
+      user.password
+    );
+
+    //Credenciales inválidas
+    if (!validPassword) {
+      return res.status(401).json({
+        message: 'Invalid credentials'
+      });
+    }
+
+    const roles = user.user_roles.map(
+      ur => ur.role.name
+    );
+
+    const token = jwt.sign(
+      {
+        user_id: user.user_id,
+        email: user.email,
+        roles
+      },
+      process.env.JWT_SECRET,
+      {
+        expiresIn: '5h'
+      }
+    );
+
+    res.json({
+      token
+    });
+
+  } catch (error) {
+
+    res.status(500).json({
+      error: error.message
+    });
+
+  }
+};
+
+export const me = async (req, res) => {
+
+  res.json({
+    user: req.user
+  });
+
+};

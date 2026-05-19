@@ -1,0 +1,78 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  schemas = ["auth_schema"]
+}
+
+// Define los enums para el estado del usuario y los nombres de los roles
+enum UserState {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+
+  //Esquema al que pertenece el modelo
+  @@schema("auth_schema")
+}
+enum RoleName {
+  ADMIN
+  STUDENT
+  TEACHER
+  PARENT
+
+  //Esquema al que pertenece el modelo
+  @@schema("auth_schema")
+}
+// ------------------------------------------------------------------------
+
+// Define los modelos para User, Role y UserRole con sus relaciones
+model User {
+  user_id String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name String 
+  last_name String
+  email String @unique
+  password String
+  state UserState @default(ACTIVE) 
+  created_at DateTime @default(now())
+
+  // Define la relacion con UserRole (Uno : Muchos)
+  user_roles UserRole[]
+
+  //Esquema al que pertenece el modelo
+  @@schema("auth_schema")
+}
+
+model UserRole {
+  user_id String @db.Uuid
+  role_id String @db.Uuid
+
+  //Define las relaciones con User y Role (Muchos : Uno) (FK)
+  user User @relation(fields: [user_id], references: [user_id])
+  role Role @relation(fields: [role_id], references: [role_id])
+
+  // Define la clave primaria compuesta por user_id y role_id
+  @@id([role_id, user_id])
+
+  //Esquema al que pertenece el modelo
+  @@schema("auth_schema")
+}
+
+model Role {
+  role_id String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name RoleName @unique @default(STUDENT)
+
+  // Define la relacion con UserRole (Uno : Muchos)
+  user_roles UserRole[]
+
+  //Esquema al que pertenece el modelo
+  @@schema("auth_schema")
+}
+
