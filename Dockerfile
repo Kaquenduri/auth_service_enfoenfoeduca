@@ -4,14 +4,12 @@ WORKDIR /app
 
 COPY package.json pnpm-lock.yaml ./
 
-RUN corepack enable
-
-RUN pnpm install
+RUN corepack enable && pnpm install
 
 COPY . .
 
-RUN pnpm prisma generate
+RUN npx prisma generate
 
-EXPOSE 3000
+EXPOSE 8080
 
 CMD ["pnpm", "start"]
