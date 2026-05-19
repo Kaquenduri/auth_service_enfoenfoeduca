@@ -6,8 +6,6 @@ COPY package.json pnpm-lock.yaml ./
 
 RUN corepack enable
 
-RUN pnpm config set onlyBuiltDependencies false
-
 RUN pnpm install
 
 COPY . .
