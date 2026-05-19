@@ -8,7 +8,7 @@ RUN corepack enable && pnpm install
 
 COPY . .
 
-RUN npx prisma generate
+RUN pnpm dlx prisma generate
 
 EXPOSE 8080
 
