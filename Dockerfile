@@ -4,7 +4,11 @@ WORKDIR /app
 
 COPY package.json pnpm-lock.yaml ./
 
-RUN corepack enable && pnpm install --ignore-scripts=false
+RUN corepack enable
+
+RUN pnpm config set onlyBuiltDependencies false
+
+RUN pnpm install
 
 COPY . .
 
@@ -13,4 +17,3 @@ RUN pnpm prisma generate
 EXPOSE 3000
 
 CMD ["pnpm", "start"]
-
