@@ -4,6 +4,9 @@ WORKDIR /app
 
 COPY package.json pnpm-lock.yaml ./
 
+# Configurar pnpm para que haga hoisting (necesario para que Prisma encuentre sus dependencias internas)
+RUN echo "node-linker=hoisted" > .npmrc
+
 RUN corepack enable && pnpm install
 
 COPY . .
