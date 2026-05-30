@@ -15,6 +15,6 @@ export const registerSchema = z.object({
     password: z.string()
         .min(6),
 
-    rol: z.string().optional(),
+    role: z.string().optional(),
 
 });
