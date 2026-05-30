@@ -27,6 +27,7 @@ enum RoleName {
   STUDENT
   TEACHER
   PARENT
+  DIRECTOR
 
   //Esquema al que pertenece el modelo
   @@schema("auth_schema")
