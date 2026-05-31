@@ -148,3 +148,21 @@ export const me = async (req, res) => {
   });
 
 };
+
+export const getUserById = async (req, res) => {
+  try{
+    const { id } = req.params;
+
+    const user = await prisma.user.findUnique({
+      where:{
+        user_id: id
+      }
+    })
+
+    res.json(user);
+  } catch (error) {
+    res.status(500).json({
+      error: error.message
+    });
+  }
+}
