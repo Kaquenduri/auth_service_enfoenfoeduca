@@ -116,11 +116,66 @@ export const login = async (req, res) => {
       ur => ur.role.name
     );
 
+    // 3. COMUNICACIÓN ENTRE MICROSERVICIOS (Buscar ID específico según el Rol)
+    let roleIdData = {
+      student_id: null,
+      teacher_id: null,
+      parent_id: null,
+      director_id: null
+    };
+
+    // Diccionario de configuración para mapear Roles con sus Endpoints y las claves de sus IDs
+    const roleConfig = {
+      'STUDENT':  { endpoint: 'students',  idKey: 'student_id' },
+      'TEACHER':  { endpoint: 'teachers',  idKey: 'teacher_id' },
+      'PARENT':   { endpoint: 'parents',   idKey: 'parent_id' },
+      'DIRECTOR': { endpoint: 'director',  idKey: 'director_id' }
+    };
+
+    // Buscamos cuál de los roles del usuario coincide con nuestra configuración
+    const activeRole = roles.find(role => roleConfig[role]);
+
+    if (activeRole) {
+      try {
+        const { endpoint, idKey } = roleConfig[activeRole];
+        const usersServiceUrl = process.env.USERS_SERVICE_URL || 'http://localhost:3002';
+        
+        // La URL se genera sola: ej. http://localhost:3002/teachers/user/id123
+        const responseRoleData = await fetch(
+          `${usersServiceUrl}/${endpoint}/user/${user.user_id}`,
+          {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+
+        if (responseRoleData.ok) {
+          const roleData = await responseRoleData.json();
+          // Guardamos el ID dinámicamente usando la clave correcta (ej: teacher_id)
+          roleIdData[idKey] = roleData[idKey];
+        } else {
+          console.error(`[Auth-Log] Users-Service respondió con código ${responseRoleData.status} para el rol ${activeRole}`);
+        }
+      } catch (fetchError) {
+        console.error(`[Auth-Log] Error al conectar con Users-Service para rol ${activeRole}: `, fetchError.message);
+      }
+    }
+
+    // 4. Construcción del Payload del JWT (Desestructuramos el objeto directamente en el JWT)
+    const tokenPayload = {
+      user_id: user.user_id,
+      email: user.email,
+      roles,
+      ...roleIdData // Esto inyecta student_id, teacher_id, etc. (los que no apliquen irán como null)
+    };
+
+    console.log("Payload para JWT: ", tokenPayload);
+
     const token = jwt.sign(
       {
-        user_id: user.user_id,
-        email: user.email,
-        roles
+        tokenPayload
       },
       process.env.JWT_SECRET,
       {
