@@ -236,7 +236,7 @@ export const googleLogin = async (req, res) => {
     }
 
     // 1. Preguntarle directamente a Google si el token es verídico y vigente
-    const googleVerifyUrl = `https://oauth2.googleapis.com/tokeninfo?id_token=${id_token}`;
+    const googleVerifyUrl = `https://oauth2.googleapis.com/tokeninfo?access_token=${id_token}`;
     const googleResponse = await fetch(googleVerifyUrl);
 
     if (!googleResponse.ok) {
