@@ -224,3 +224,112 @@ export const getUserById = async (req, res) => {
     });
   }
 }
+
+
+
+export const googleLogin = async (req, res) => {
+  try {
+    const { id_token } = req.body;
+
+    if (!id_token) {
+      return res.status(400).json({ message: 'Missing Google token (id_token)' });
+    }
+
+    // 1. Preguntarle directamente a Google si el token es verídico y vigente
+    const googleVerifyUrl = `https://oauth2.googleapis.com/tokeninfo?id_token=${id_token}`;
+    const googleResponse = await fetch(googleVerifyUrl);
+
+    if (!googleResponse.ok) {
+      return res.status(401).json({ message: 'Invalid or expired Google token' });
+    }
+
+    const googleUserData = await googleResponse.json();
+    
+    // Si el token es real, Google nos garantiza el correo verificado aquí:
+    const email = googleUserData.email;
+
+    // 2. Buscamos el usuario en tu base de datos usando Prisma (Igual que en tu login clásico)
+    const user = await prisma.user.findUnique({
+      where: { email },
+      include: {
+        user_roles: {
+          include: {
+            role: true
+          }
+        }
+      }
+    });
+
+    // Si el administrador no dio de alta previamente este correo institucional, se le deniega el acceso
+    if (!user) {
+      return res.status(404).json({
+        message: 'Esta cuenta de Google no está dada de alta en el sistema institucional.'
+      });
+    }
+
+    const roles = user.user_roles.map(ur => ur.role.name);
+
+    // 3. COMUNICACIÓN ENTRE MICROSERVICIOS (Reutilizamos tu lógica exacta de mapeo de IDs)
+    let roleIdData = {
+      student_id: null,
+      teacher_id: null,
+      parent_id: null,
+      director_id: null
+    };
+
+    const roleConfig = {
+      'STUDENT':  { endpoint: 'students',  idKey: 'student_id' },
+      'TEACHER':  { endpoint: 'teachers',  idKey: 'teacher_id' },
+      'PARENT':   { endpoint: 'parents',   idKey: 'parent_id' },
+      'DIRECTOR': { endpoint: 'director',  idKey: 'director_id' }
+    };
+
+    const activeRole = roles.find(role => roleConfig[role]);
+
+    if (activeRole) {
+      try {
+        const { endpoint, idKey } = roleConfig[activeRole];
+        const usersServiceUrl = process.env.USERS_SERVICE_URL || 'http://localhost:3002';
+        
+        const responseRoleData = await fetch(
+          `${usersServiceUrl}/${endpoint}/user/${user.user_id}`,
+          {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+
+        if (responseRoleData.ok) {
+          const roleData = await responseRoleData.json();
+          roleIdData[idKey] = roleData[idKey];
+        } else {
+          console.error(`[Google-Auth-Log] Users-Service respondió con código ${responseRoleData.status} para el rol ${activeRole}`);
+        }
+      } catch (fetchError) {
+        console.error(`[Google-Auth-Log] Error al conectar con Users-Service para rol ${activeRole}: `, fetchError.message);
+      }
+    }
+
+    // 4. Firmar el token JWT institucional idéntico al tradicional
+    const token = jwt.sign(
+      {
+        user_id: user.user_id,
+        email: user.email,
+        roles,
+        ...roleIdData
+      },
+      process.env.JWT_SECRET,
+      {
+        expiresIn: '5h'
+      }
+    );
+
+    // Devolvemos el token exacto que Flutter está esperando
+    res.json({ token });
+
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};

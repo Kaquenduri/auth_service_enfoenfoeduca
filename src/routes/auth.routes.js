@@ -4,7 +4,8 @@ import {
   register,
   login,
   me,
-  getUserById
+  getUserById,
+  googleLogin
 } from '../controllers/auth.controller.js';
 
 import { validate } from '../middleware/validate.js';
@@ -19,5 +20,6 @@ router.post('/register',validate(registerSchema), register);
 router.post('/login', authLimiter, login);
 router.get('/me', verifyToken, me);
 router.get('/users/:id', getUserById);
+router.post('/google-login', googleLogin);
 
 export default router;
