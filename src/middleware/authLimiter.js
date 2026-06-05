@@ -4,7 +4,7 @@ export const authLimiter = rateLimit({
 
     windowMs: 10 * 60 * 1000,
 
-    max: 5,
+    max: 4,
 
     skipSuccessfulRequests: true,
 
